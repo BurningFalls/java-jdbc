@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.SQLException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Stage1Test {
 
@@ -38,6 +39,9 @@ class Stage1Test {
         assertThat(jdbcConnectionPool.getActiveConnections()).isZero();
 
         jdbcConnectionPool.dispose();
+
+        assertThatThrownBy(jdbcConnectionPool::getConnection)
+                .isInstanceOf(IllegalStateException.class);
     }
 
     /**

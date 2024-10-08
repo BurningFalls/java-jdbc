@@ -10,6 +10,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.List;
+
 /**
  * 트랜잭션 전파(Transaction Propagation)란?
  * 트랜잭션의 경계에서 이미 진행 중인 트랜잭션이 있을 때 또는 없을 때 어떻게 동작할 것인가를 결정하는 방식을 말한다.
@@ -45,8 +47,8 @@ class Stage2Test {
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(1)
+                .containsExactly("transaction.stage2.FirstUserService.saveFirstTransactionWithRequired");
     }
 
     /**
@@ -59,8 +61,9 @@ class Stage2Test {
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(2)
+                .containsExactly("transaction.stage2.SecondUserService.saveSecondTransactionWithRequiresNew",
+                        "transaction.stage2.FirstUserService.saveFirstTransactionWithRequiredNew");
     }
 
     /**
@@ -69,26 +72,28 @@ class Stage2Test {
      */
     @Test
     void testRequiredNewWithRollback() {
-        assertThat(firstUserService.findAll()).hasSize(-1);
+        assertThat(firstUserService.findAll()).hasSize(0);
 
         assertThatThrownBy(() -> firstUserService.saveAndExceptionWithRequiredNew())
                 .isInstanceOf(RuntimeException.class);
 
-        assertThat(firstUserService.findAll()).hasSize(-1);
+        assertThat(firstUserService.findAll()).hasSize(1);
     }
 
     /**
      * FirstUserService.saveFirstTransactionWithSupports() 메서드를 보면 @Transactional이 주석으로 되어 있다.
      * 주석인 상태에서 테스트를 실행했을 때와 주석을 해제하고 테스트를 실행했을 때 어떤 차이점이 있는지 확인해보자.
      */
+    // 주석처리 -> 1 / "transaction.stage2.SecondUserService.saveSecondTransactionWithSupports"
+    // 주석해제 -> 1 / "transaction.stage2.FirstUserService.saveFirstTransactionWithSupports"
     @Test
     void testSupports() {
         final var actual = firstUserService.saveFirstTransactionWithSupports();
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(1)
+                .containsExactly("transaction.stage2.FirstUserService.saveFirstTransactionWithSupports");
     }
 
     /**
@@ -96,14 +101,16 @@ class Stage2Test {
      * 주석인 상태에서 테스트를 실행했을 때와 주석을 해제하고 테스트를 실행했을 때 어떤 차이점이 있는지 확인해보자.
      * SUPPORTS와 어떤 점이 다른지도 같이 챙겨보자.
      */
+    // 주석처리 -> No existing transaction found for transaction marked with propagation 'mandatory'
+    // 주석해제 -> 1 / "transaction.stage2.FirstUserService.saveFirstTransactionWithMandatory"
     @Test
     void testMandatory() {
         final var actual = firstUserService.saveFirstTransactionWithMandatory();
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(1)
+                .containsExactly("transaction.stage2.FirstUserService.saveFirstTransactionWithMandatory");
     }
 
     /**
@@ -113,40 +120,49 @@ class Stage2Test {
      *
      * 스프링 공식 문서에서 물리적 트랜잭션과 논리적 트랜잭션의 차이점이 무엇인지 찾아보자.
      */
+    // 주석해제 -> 2 / 물리적: 1 / ["transaction.stage2.SecondUserService.saveSecondTransactionWithNotSupported",
+    //    "transaction.stage2.FirstUserService.saveFirstTransactionWithNotSupported"]
+    // 주석처리 -> 1 / 물리적: 0 / "transaction.stage2.SecondUserService.saveSecondTransactionWithNotSupported"
     @Test
     void testNotSupported() {
         final var actual = firstUserService.saveFirstTransactionWithNotSupported();
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(1)
+                .containsExactly("transaction.stage2.SecondUserService.saveSecondTransactionWithNotSupported");
     }
 
     /**
      * 아래 테스트는 왜 실패할까?
      * FirstUserService.saveFirstTransactionWithNested() 메서드의 @Transactional을 주석 처리하면 어떻게 될까?
      */
+    // 주석해제 -> JpaDialect does not support savepoints - check your JPA provider's capabilities
+    //              org.springframework.transaction
+    // 주석처리 -> 1 / "transaction.stage2.SecondUserService.saveSecondTransactionWithNested"
     @Test
     void testNested() {
         final var actual = firstUserService.saveFirstTransactionWithNested();
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(1)
+                .containsExactly("transaction.stage2.SecondUserService.saveSecondTransactionWithNested");
     }
 
     /**
      * 마찬가지로 @Transactional을 주석처리하면서 관찰해보자.
      */
+    // 주석해제 -> Existing transaction found for transaction marked with propagation 'never'
+    //              org.springframework.transaction
+    // 주석처리 -> 1 / "transaction.stage2.SecondUserService.saveSecondTransactionWithNever"
     @Test
     void testNever() {
         final var actual = firstUserService.saveFirstTransactionWithNever();
 
         log.info("transactions : {}", actual);
         assertThat(actual)
-                .hasSize(0)
-                .containsExactly("");
+                .hasSize(1)
+                .containsExactly("transaction.stage2.SecondUserService.saveSecondTransactionWithNever");
     }
 }
