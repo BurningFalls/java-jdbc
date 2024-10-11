@@ -6,6 +6,8 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 
 import com.interface21.dao.DataAccessException;
+import com.interface21.jdbc.datasource.DataSourceUtils;
+import com.interface21.transaction.support.TransactionSynchronizationManager;
 import com.techcourse.config.DataSourceConfig;
 import com.techcourse.dao.UserDao;
 import com.techcourse.dao.UserHistoryDao;
@@ -33,7 +35,10 @@ public class UserService {
     }
 
     public void changePassword(final long id, final String newPassword, final String createBy) {
-        try (final var conn = dataSource.getConnection()) {
+        try {
+            final Connection conn = DataSourceUtils.getConnection(dataSource);
+            conn.setAutoCommit(false);
+
             changePasswordWithTransaction(id, newPassword, createBy, conn);
         } catch (SQLException e) {
             throw new DataAccessException("Connection failed", e);
@@ -41,7 +46,6 @@ public class UserService {
     }
 
     private void changePasswordWithTransaction(final long id, final String newPassword, final String createBy, final Connection conn) throws SQLException {
-        conn.setAutoCommit(false);
         try {
             final var user = findById(id);
             user.changePassword(newPassword);
@@ -52,6 +56,9 @@ public class UserService {
         } catch (DataAccessException e) {
             handleRollback(conn);
             throw new DataAccessException("Transaction failed and rolled back", e);
+        } finally {
+            DataSourceUtils.releaseConnection(conn, dataSource);
+            TransactionSynchronizationManager.unbindResource(dataSource);
         }
     }
 
